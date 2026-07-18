@@ -213,15 +213,28 @@
     <span class="lbl">VOICE LIBRARY:</span>
     <select class="tsel" id="presetSel">
       <option value="">&mdash; SELECT &mdash;</option>
-      <option value="brass">BRASS SWELL</option>
-      <option value="vox">VOX HUMANA</option>
-      <option value="organ">DRAWBAR ORGAN</option>
-      <option value="saw">SAWTOOTH</option>
-      <option value="square">HOLLOW SQUARE</option>
-      <option value="bell">TRUE BELL (INHARMONIC)</option>
-      <option value="piano">STIFF STRING</option>
-      <option value="gamelan">GAMELAN (STRETCHED)</option>
-      <option value="strings">STRING ENSEMBLE</option>
+      <optgroup label="CLASSIC">
+        <option value="saw">SAWTOOTH</option>
+        <option value="tri">TRIANGLE</option>
+        <option value="square">HOLLOW SQUARE</option>
+        <option value="supersaw">SUPER SAW</option>
+        <option value="organ">DRAWBAR ORGAN</option>
+        <option value="strings">STRING ENSEMBLE</option>
+        <option value="brass">BRASS SWELL</option>
+      </optgroup>
+      <optgroup label="FORMANT">
+        <option value="vox">VOX HUMANA</option>
+        <option value="vAH">VOWEL AH</option>
+        <option value="vEE">VOWEL EE</option>
+        <option value="vOO">VOWEL OO</option>
+        <option value="vCycle">VOWEL CYCLE A-E-I-O-U</option>
+        <option value="vDiph">DIPHTHONG AH &rarr; OO</option>
+      </optgroup>
+      <optgroup label="INHARMONIC">
+        <option value="bell">TRUE BELL</option>
+        <option value="piano">STIFF STRING</option>
+        <option value="gamelan">GAMELAN (STRETCHED)</option>
+      </optgroup>
     </select>
   </div>
   <div class="tools" id="toolsEnv" style="display:none">
@@ -371,10 +384,51 @@ const ratioOf = n => Math.pow(n,P.stretch)*Math.sqrt(1+(P.inharm*1e-3)*n*n);
 function genFrames(fn){ const f = blankFrames();
   for(let t=0;t<NF;t++) for(let h=0;h<NH;h++) f[t][h]=Math.max(0,Math.min(1,fn(t/(NF-1),h+1)));
   return f; }
+function normFrames(f){ let m=0;
+  for(let t=0;t<NF;t++) for(let h=0;h<NH;h++) m=Math.max(m,f[t][h]);
+  if(m>0) for(let t=0;t<NF;t++) for(let h=0;h<NH;h++) f[t][h]/=m;
+  return f; }
+
+/* --- formant bank: partial amplitudes from vocal-tract resonances.
+   Formant centers (Hz) mapped onto the partial series at a 110 Hz
+   reference fundamental, over a -0.55-slope glottal source tilt. --- */
+const F0REF=110;
+const VOWELS={
+  AH:[[730,1.0, 90],[1090,.50,110],[2440,.35,160]],
+  EH:[[530,1.0, 80],[1840,.45,120],[2480,.30,160]],
+  EE:[[270,1.0, 60],[2290,.35,150],[3010,.30,180]],
+  OH:[[570,1.0, 80],[ 840,.60, 90],[2410,.25,150]],
+  OO:[[300,1.0, 60],[ 870,.50, 90],[2240,.20,140]],
+};
+function vowelAmp(form,n){
+  let a=0;
+  const tilt=1/Math.pow(n,0.55);
+  for(const [F,g,bw] of form){
+    const c=F/F0REF, w=Math.max(0.8,bw/F0REF);
+    a+=g*Math.exp(-((n-c)*(n-c))/(2*w*w));
+  }
+  return a*tilt;
+}
+function vowelMix(seq,t,n){
+  const pos=t*(seq.length-1), i=Math.floor(pos), fr=pos-i;
+  const a=vowelAmp(VOWELS[seq[i]],n);
+  const b=vowelAmp(VOWELS[seq[Math.min(i+1,seq.length-1)]],n);
+  return a+(b-a)*fr;
+}
+const staticVowel=key=>normFrames(genFrames((t,n)=>
+  vowelAmp(VOWELS[key],n)*(1+0.05*Math.sin(t*7+n))));   // slight breath drift
 
 const PRESETS = {
   saw:    {str:1, inh:0, gen:()=>genFrames((t,n)=>1/n)},
+  tri:    {str:1, inh:0, gen:()=>genFrames((t,n)=>n%2?1/(n*n):0)},
   square: {str:1, inh:0, gen:()=>genFrames((t,n)=>n%2?1/n:0)},
+  supersaw:{str:1, inh:0, ft:50, scan:'pingpong', gen:()=>normFrames(genFrames((t,n)=>{
+            // saw spectrum + per-partial beating at incommensurate rates,
+            // the amplitude signature of stacked detuned saws
+            const rate=1.5+((n*7919)%13)*0.45;
+            const ph=(n*2654)%6.28;
+            const depth=Math.min(0.85,0.10+n*0.028);
+            return (1/n)*(1+depth*Math.sin(6.283*t*rate+ph)); }))},
   organ:  {str:1, inh:0, gen:()=>genFrames((t,n)=>{
             const db={1:1,2:.6,3:.75,4:.15,6:.45,8:.3,10:.12,12:.2};
             return (db[n]||0)*(1+0.06*Math.sin(t*6+n)); })},
@@ -385,6 +439,13 @@ const PRESETS = {
             const f1=4-2.5*t, f2=11-6*t;
             const g=(c,w)=>Math.exp(-((n-c)*(n-c))/(2*w*w));
             return 0.9*g(1,1.1)+0.8*g(f1,1.4)+0.55*g(f2,1.8); })},
+  vAH:    {str:1, inh:0, gen:()=>staticVowel('AH')},
+  vEE:    {str:1, inh:0, gen:()=>staticVowel('EE')},
+  vOO:    {str:1, inh:0, gen:()=>staticVowel('OO')},
+  vCycle: {str:1, inh:0, ft:150, scan:'pingpong', gen:()=>normFrames(genFrames((t,n)=>
+            vowelMix(['AH','EH','EE','OH','OO'],t,n)))},
+  vDiph:  {str:1, inh:0, ft:60, scan:'oneshot', gen:()=>normFrames(genFrames((t,n)=>
+            vowelMix(['AH','OO'],Math.pow(t,1.4),n)))},
   strings:{str:1, inh:0, gen:()=>genFrames((t,n)=>{
             const sh=1+0.15*Math.sin(t*9+n*1.7);
             return (1/Math.pow(n,1.15))*sh*(n<28?1:0); })},
@@ -887,6 +948,11 @@ document.getElementById('presetSel').onchange=e=>{
     document.getElementById('v_str').textContent=pr.str.toFixed(3);
     document.getElementById('v_inh').textContent=pr.inh.toFixed(1);
     document.getElementById('v_p32').textContent=ratioOf(32).toFixed(2);
+    if(pr.ft){ P.ftime=pr.ft/1000;
+      document.getElementById('p_ftime').value=pr.ft;
+      document.getElementById('v_ftime').textContent=pr.ft+' MS'; }
+    if(pr.scan){ P.scan=pr.scan;
+      document.querySelectorAll('#scanSeg button').forEach(b=>b.classList.toggle('on',b.dataset.v===pr.scan)); }
     retuneLive(); updateCaps();
     drawSurface(); drawAllTabs();
   }
