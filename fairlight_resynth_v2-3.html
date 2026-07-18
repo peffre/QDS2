@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QDS-II/B RESYNTHESIS ENGINE</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ph:  #47ff8a;
+    --ph2: #2ecb6a;
+    --dim: #0f5a2e;
+    --grid:#0a3a1f;
+    --bg:  #04120a;
+    --bg2: #061a0e;
+    --panel:#05170c;
+    --amber:#ffd23f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{background:#020a06;}
+  body{
+    font-family:'VT323', 'Courier New', monospace;
+    color:var(--ph);
+    letter-spacing:0.04em;
+    padding:14px;
+    min-height:100vh;
+  }
+  body::after{
+    content:""; position:fixed; inset:0; pointer-events:none; z-index:50;
+    background:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.16) 0px, rgba(0,0,0,0.16) 1px, transparent 1px, transparent 3px),
+      radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.45) 100%);
+  }
+  .crt{max-width:1080px; margin:0 auto;}
+
+  header{
+    border:2px solid var(--dim);
+    background:var(--panel);
+    padding:10px 14px 8px;
+    display:flex; flex-wrap:wrap; align-items:baseline; gap:8px 18px;
+    box-shadow:0 0 24px rgba(46,203,106,0.10) inset;
+  }
+  h1{font-size:30px; font-weight:normal; text-shadow:0 0 8px rgba(71,255,138,0.55);}
+  h1 small{font-size:16px; color:var(--ph2);}
+  .sysline{margin-left:auto; font-size:16px; color:var(--ph2); display:flex; gap:14px; align-items:center;}
+  #powerBtn{
+    font-family:inherit; font-size:18px; letter-spacing:0.08em;
+    background:var(--bg2); color:var(--ph); border:2px solid var(--ph2);
+    padding:2px 14px; cursor:pointer;
+  }
+  #powerBtn.on{background:var(--ph); color:#04120a; text-shadow:none; box-shadow:0 0 14px rgba(71,255,138,0.7);}
+  #cpu{color:var(--dim);}
+
+  .page{
+    border:2px solid var(--dim);
+    border-top:none;
+    background:var(--panel);
+    padding:12px 14px 16px;
+  }
+  .pagehead{
+    display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
+    border-bottom:1px solid var(--grid);
+    padding-bottom:6px; margin-bottom:10px;
+  }
+  .pagehead .pageno{font-size:22px; text-shadow:0 0 8px rgba(71,255,138,0.5);}
+  .pagehead .pagedesc{font-size:16px; color:var(--ph2);}
+  .pagehead .right{margin-left:auto; font-size:15px; color:var(--dim);}
+
+  .modebar{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px;}
+  .seg{display:flex; gap:4px;}
+  .seg button{
+    font-family:inherit; font-size:16px; background:var(--bg2); color:var(--ph2);
+    border:1px solid var(--dim); padding:2px 12px; cursor:pointer; letter-spacing:0.06em;
+  }
+  .seg button.on{background:var(--ph); color:#04120a;}
+  .psel{display:flex; align-items:center; gap:4px; font-size:17px;}
+  .psel button{
+    font-family:inherit; font-size:16px; background:var(--bg2); color:var(--ph);
+    border:1px solid var(--ph2); padding:1px 10px; cursor:pointer;
+  }
+  .psel #pselLbl{min-width:150px; text-align:center; color:var(--amber); text-shadow:0 0 6px rgba(255,210,63,0.5);}
+
+  .frames{display:flex; gap:4px; flex-wrap:wrap; margin-bottom:8px;}
+  .ftab{
+    width:48px; border:1px solid var(--dim); background:var(--bg);
+    cursor:pointer; padding:2px 2px 0; text-align:center;
+  }
+  .ftab canvas{display:block; width:100%; height:20px; image-rendering:pixelated;}
+  .ftab .flab{font-size:12px; color:var(--ph2);}
+  .ftab.active{border-color:var(--ph); box-shadow:0 0 10px rgba(71,255,138,0.35);}
+  .ftab.playing .flab{color:var(--amber); text-shadow:0 0 6px rgba(255,210,63,0.8);}
+
+  .drawwrap{display:grid; grid-template-columns:1fr 300px; gap:12px;}
+  @media (max-width:840px){ .drawwrap{grid-template-columns:1fr;} }
+  .canvasbox{border:1px solid var(--dim); background:var(--bg); position:relative;}
+  .canvasbox .cap{
+    position:absolute; top:4px; left:8px; font-size:14px; color:var(--dim); pointer-events:none; z-index:2;
+  }
+  #harmCanvas{display:block; width:100%; height:250px; cursor:crosshair; touch-action:none;}
+  .sidecol{display:flex; flex-direction:column; gap:12px;}
+  #waveCanvas,#scopeCanvas{display:block; width:100%; height:110px;}
+
+  .tools{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;}
+  .tbtn, select.tsel{
+    font-family:inherit; font-size:16px; letter-spacing:0.06em;
+    background:var(--bg2); color:var(--ph); border:1px solid var(--ph2);
+    padding:3px 10px; cursor:pointer;
+  }
+  .tbtn:hover{background:var(--dim);}
+  .tbtn:active{background:var(--ph); color:#04120a;}
+  select.tsel{appearance:none;}
+  .tools .lbl{font-size:15px; color:var(--ph2); align-self:center; margin-left:6px;}
+
+  .ctrlgrid{
+    display:grid; gap:14px;
+    grid-template-columns:repeat(auto-fit, minmax(185px, 1fr));
+  }
+  fieldset{border:1px solid var(--grid); padding:8px 10px 10px;}
+  legend{font-size:16px; color:var(--ph); padding:0 6px; text-shadow:0 0 6px rgba(71,255,138,0.4);}
+  .param{margin-bottom:7px;}
+  .param .row{display:flex; justify-content:space-between; font-size:15px; color:var(--ph2);}
+  .param .val{color:var(--ph); min-width:64px; text-align:right;}
+  input[type=range]{
+    -webkit-appearance:none; appearance:none; width:100%; height:16px;
+    background:transparent; cursor:ew-resize;
+  }
+  input[type=range]::-webkit-slider-runnable-track{height:4px; background:var(--dim);}
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none; width:10px; height:16px; margin-top:-6px;
+    background:var(--ph); box-shadow:0 0 8px rgba(71,255,138,0.7);
+  }
+  input[type=range]::-moz-range-track{height:4px; background:var(--dim);}
+  input[type=range]::-moz-range-thumb{width:10px; height:16px; border:none; border-radius:0; background:var(--ph); box-shadow:0 0 8px rgba(71,255,138,0.7);}
+  .seg2{display:flex; gap:4px;}
+  .seg2 button{
+    flex:1; font-family:inherit; font-size:15px; background:var(--bg2); color:var(--ph2);
+    border:1px solid var(--dim); padding:2px 0; cursor:pointer;
+  }
+  .seg2 button.on{background:var(--ph); color:#04120a;}
+
+  .kbwrap{border:2px solid var(--dim); border-top:none; background:var(--panel); padding:10px 14px 14px;}
+  .kbhead{display:flex; gap:16px; font-size:15px; color:var(--ph2); margin-bottom:8px; flex-wrap:wrap;}
+  #kb{display:flex; position:relative; height:120px; user-select:none;}
+  .key{position:relative; flex:1; border:1px solid var(--dim); background:var(--bg2); cursor:pointer;}
+  .key.white.down{background:var(--dim);}
+  .key .bk{
+    position:absolute; top:0; right:-22%; width:44%; height:60%;
+    background:#020a06; border:1px solid var(--ph2); z-index:2; cursor:pointer;
+  }
+  .key .bk.down{background:var(--ph2);}
+  .key .kl{position:absolute; bottom:3px; left:0; right:0; text-align:center; font-size:13px; color:var(--dim); pointer-events:none;}
+  footer{margin-top:8px; text-align:center; font-size:14px; color:var(--dim);}
+</style>
+</head>
+<body>
+<div class="crt">
+
+<header>
+  <h1>QDS-II/B <small>PER-PARTIAL RESYNTHESIS &middot; INHARMONIC MODE</small></h1>
+  <div class="sysline">
+    <span id="cpu">32 PARTIALS &middot; 16 FRAMES &middot; 8 VOICES</span>
+    <button id="powerBtn">AUDIO: OFF</button>
+  </div>
+</header>
+
+<!-- PAGE 4/5 : PARTIAL PROFILES & ENVELOPES -->
+<section class="page">
+  <div class="pagehead">
+    <span class="pageno">PAGE 4/5 &mdash; PARTIAL AMPLITUDES</span>
+    <span class="pagedesc">SPECTRUM: DRAW ALL PARTIALS AT ONE FRAME &middot; ENVELOPE: DRAW ONE PARTIAL ACROSS TIME</span>
+    <span class="right" id="penReadout">--</span>
+  </div>
+
+  <div class="modebar">
+    <span style="font-size:16px;color:var(--ph2)">EDIT MODE:</span>
+    <div class="seg" id="modeSeg">
+      <button data-v="spec" class="on">SPECTRUM</button>
+      <button data-v="env">ENVELOPE</button>
+      <button data-v="fall">WATERFALL</button>
+    </div>
+    <div class="psel">
+      <button id="pPrev">&#9664;</button>
+      <span id="pselLbl">PARTIAL 01 &middot; R 1.000</span>
+      <button id="pNext">&#9654;</button>
+    </div>
+  </div>
+
+  <div class="frames" id="frameTabs"></div>
+
+  <div class="drawwrap">
+    <div class="canvasbox">
+      <span class="cap" id="canvasCap">AMPLITUDE &mdash; FRAME 1</span>
+      <canvas id="harmCanvas" width="720" height="250"></canvas>
+    </div>
+    <div class="sidecol">
+      <div class="canvasbox">
+        <span class="cap">WAVEFORM (COMPUTED, 2 CYCLES)</span>
+        <canvas id="waveCanvas" width="300" height="110"></canvas>
+      </div>
+      <div class="canvasbox">
+        <span class="cap">OUTPUT MONITOR</span>
+        <canvas id="scopeCanvas" width="300" height="110"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="tools" id="toolsSpec">
+    <button class="tbtn" id="clearBtn">CLEAR FRAME</button>
+    <button class="tbtn" id="copyNextBtn">COPY &rarr; NEXT</button>
+    <button class="tbtn" id="copyAllBtn">COPY &rarr; ALL</button>
+    <button class="tbtn" id="halveBtn">DAMP &frac12;</button>
+    <span class="lbl">VOICE LIBRARY:</span>
+    <select class="tsel" id="presetSel">
+      <option value="">&mdash; SELECT &mdash;</option>
+      <option value="brass">BRASS SWELL</option>
+      <option value="vox">VOX HUMANA</option>
+      <option value="organ">DRAWBAR ORGAN</option>
+      <option value="saw">SAWTOOTH</option>
+      <option value="square">HOLLOW SQUARE</option>
+      <option value="bell">TRUE BELL (INHARMONIC)</option>
+      <option value="piano">STIFF STRING</option>
+      <option value="gamelan">GAMELAN (STRETCHED)</option>
+      <option value="strings">STRING ENSEMBLE</option>
+    </select>
+  </div>
+  <div class="tools" id="toolsEnv" style="display:none">
+    <button class="tbtn" id="envClearBtn">CLEAR ENVELOPE</button>
+    <button class="tbtn" id="envDecayBtn">EXP DECAY</button>
+    <button class="tbtn" id="envSwellBtn">SWELL</button>
+    <button class="tbtn" id="envApplyBtn">APPLY SHAPE &rarr; ALL PARTIALS</button>
+    <span class="lbl">SHAPE IS NORMALIZED &amp; SCALED TO EACH PARTIAL'S PEAK</span>
+  </div>
+  <div class="tools" id="toolsFall" style="display:none">
+    <span class="lbl">ROWS:</span>
+    <div class="seg" id="fallSeg">
+      <button data-v="spectra" class="on">SPECTRA</button>
+      <button data-v="waves">WAVEFORMS</button>
+      <button data-v="contours">CONTOURS</button>
+    </div>
+    <span class="lbl">CLICK A RIDGE TO SELECT &middot; AMBER RIDGE = SCAN POSITION</span>
+  </div>
+</section>
+
+<!-- PAGE 7 : CONTROL PARAMETERS -->
+<section class="page">
+  <div class="pagehead">
+    <span class="pageno">PAGE 7 &mdash; CONTROL PARAMETERS</span>
+    <span class="right">TUNING &amp; FILTER LIVE ON HELD NOTES</span>
+  </div>
+  <div class="ctrlgrid">
+
+    <fieldset>
+      <legend>PARTIAL TUNING</legend>
+      <div class="param"><div class="row"><span>STRETCH</span><span class="val" id="v_str">1.000</span></div>
+        <input type="range" id="p_str" min="0.5" max="2" step="0.005" value="1"></div>
+      <div class="param"><div class="row"><span>INHARM B</span><span class="val" id="v_inh">0.0</span></div>
+        <input type="range" id="p_inh" min="0" max="20" step="0.1" value="0"></div>
+      <div class="param"><div class="row"><span>P32 RATIO</span><span class="val" id="v_p32">32.00</span></div></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>FRAME SCAN</legend>
+      <div class="param"><div class="row"><span>FRAME TIME</span><span class="val" id="v_ftime">80 MS</span></div>
+        <input type="range" id="p_ftime" min="10" max="600" step="5" value="80"></div>
+      <div class="param"><div class="row"><span>SCAN MODE</span></div>
+        <div class="seg2" id="scanSeg">
+          <button data-v="oneshot" class="on">1-SHOT</button>
+          <button data-v="loop">LOOP</button>
+          <button data-v="pingpong">P-PONG</button>
+        </div></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>AMPLITUDE ENVELOPE</legend>
+      <div class="param"><div class="row"><span>ATTACK</span><span class="val" id="v_att">5 MS</span></div>
+        <input type="range" id="p_att" min="1" max="3000" step="1" value="5"></div>
+      <div class="param"><div class="row"><span>DECAY</span><span class="val" id="v_dec">400 MS</span></div>
+        <input type="range" id="p_dec" min="5" max="4000" step="5" value="400"></div>
+      <div class="param"><div class="row"><span>SUSTAIN</span><span class="val" id="v_sus">75 %</span></div>
+        <input type="range" id="p_sus" min="0" max="100" step="1" value="75"></div>
+      <div class="param"><div class="row"><span>RELEASE</span><span class="val" id="v_rel">400 MS</span></div>
+        <input type="range" id="p_rel" min="10" max="6000" step="10" value="400"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>FILTER (LP)</legend>
+      <div class="param"><div class="row"><span>CUTOFF</span><span class="val" id="v_cut">12.0 KHZ</span></div>
+        <input type="range" id="p_cut" min="0" max="100" step="0.5" value="88"></div>
+      <div class="param"><div class="row"><span>RESONANCE</span><span class="val" id="v_res">0.7 Q</span></div>
+        <input type="range" id="p_res" min="0.1" max="18" step="0.1" value="0.7"></div>
+      <div class="param"><div class="row"><span>ENV AMOUNT</span><span class="val" id="v_famt">0 %</span></div>
+        <input type="range" id="p_famt" min="-100" max="100" step="1" value="0"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>VIBRATO</legend>
+      <div class="param"><div class="row"><span>RATE</span><span class="val" id="v_lrate">5.2 HZ</span></div>
+        <input type="range" id="p_lrate" min="0.1" max="12" step="0.1" value="5.2"></div>
+      <div class="param"><div class="row"><span>DEPTH</span><span class="val" id="v_ldep">0 C</span></div>
+        <input type="range" id="p_ldep" min="0" max="100" step="1" value="0"></div>
+      <div class="param"><div class="row"><span>DELAY</span><span class="val" id="v_ldel">300 MS</span></div>
+        <input type="range" id="p_ldel" min="0" max="2000" step="10" value="300"></div>
+    </fieldset>
+
+    <fieldset>
+      <legend>OUTPUT</legend>
+      <div class="param"><div class="row"><span>OCTAVE</span></div>
+        <div class="seg2" id="octSeg">
+          <button data-v="-2">-2</button><button data-v="-1">-1</button>
+          <button data-v="0" class="on">0</button>
+          <button data-v="1">+1</button><button data-v="2">+2</button>
+        </div></div>
+      <div class="param"><div class="row"><span>FINE TUNE</span><span class="val" id="v_tune">0 C</span></div>
+        <input type="range" id="p_tune" min="-100" max="100" step="1" value="0"></div>
+      <div class="param"><div class="row"><span>LEVEL</span><span class="val" id="v_vol">80 %</span></div>
+        <input type="range" id="p_vol" min="0" max="100" step="1" value="80"></div>
+    </fieldset>
+
+  </div>
+</section>
+
+<!-- KEYBOARD -->
+<section class="kbwrap">
+  <div class="kbhead">
+    <span>MUSIC KEYBOARD &mdash; QWERTY ROW [ A S D F G H J K L ; ] SHARPS [ W E T Y U O P ]</span>
+    <span>OCTAVE SHIFT [ Z / X ]</span>
+    <span id="midiStat" style="margin-left:auto;color:var(--dim)">MIDI: &mdash;</span>
+  </div>
+  <div id="kb"></div>
+</section>
+
+<footer>QDS-II/B &middot; 32 FREE-RUNNING PARTIAL OSCILLATORS PER VOICE &middot; PER-PARTIAL AMPLITUDE CONTOURS &middot; DRAW, STRETCH, PLAY</footer>
+</div>
+
+<script>
+"use strict";
+/* ============================================================
+   QDS-II/B — per-partial additive resynthesis
+   Each voice = up to 32 independent sine oscillators.
+   Partial n frequency: f0 · n^STRETCH · √(1 + B·n²)
+   Each partial's gain runs its own amplitude contour built
+   from 16 frame breakpoints (setValueCurveAtTime), so the
+   frame grid IS a bank of 32 per-partial envelopes.
+   ============================================================ */
+
+const NH = 32, NF = 16;
+
+/* ---------------- data model ---------------- */
+let frames = [];            // [NF][NH] amplitudes 0..1
+let curFrame = 0;
+let selH = 0;               // selected partial (0-indexed)
+let editMode = 'spec';      // 'spec' | 'env' | 'fall'
+let wfView = 'spectra';     // waterfall rows: 'spectra' | 'waves' | 'contours'
+
+function blankFrames(){ return Array.from({length:NF},()=>new Float32Array(NH)); }
+
+/* ---------------- parameters ---------------- */
+const P = {
+  stretch:1.0, inharm:0,          // B = inharm * 1e-3
+  ftime:0.080, scan:'oneshot',
+  att:0.005, dec:0.400, sus:0.75, rel:0.400,
+  cut:88, res:0.7, famt:0,
+  lrate:5.2, ldep:0, ldel:0.300,
+  oct:0, tune:0, vol:0.80,
+};
+const cutHz = v => 40*Math.pow(20000/40, v/100);
+const ratioOf = n => Math.pow(n,P.stretch)*Math.sqrt(1+(P.inharm*1e-3)*n*n);
+
+/* ---------------- presets ---------------- */
+function genFrames(fn){ const f = blankFrames();
+  for(let t=0;t<NF;t++) for(let h=0;h<NH;h++) f[t][h]=Math.max(0,Math.min(1,fn(t/(NF-1),h+1)));
+  return f; }
+
+const PRESETS = {
+  saw:    {str:1, inh:0, gen:()=>genFrames((t,n)=>1/n)},
+  square: {str:1, inh:0, gen:()=>genFrames((t,n)=>n%2?1/n:0)},
+  organ:  {str:1, inh:0, gen:()=>genFrames((t,n)=>{
+            const db={1:1,2:.6,3:.75,4:.15,6:.45,8:.3,10:.12,12:.2};
+            return (db[n]||0)*(1+0.06*Math.sin(t*6+n)); })},
+  brass:  {str:1, inh:0, gen:()=>genFrames((t,n)=>{
+            const bloom=Math.pow(t,0.6), cut=2+bloom*22;
+            return n<=cut?(1/Math.pow(n,0.85))*(0.35+0.65*bloom):0; })},
+  vox:    {str:1, inh:0, gen:()=>genFrames((t,n)=>{
+            const f1=4-2.5*t, f2=11-6*t;
+            const g=(c,w)=>Math.exp(-((n-c)*(n-c))/(2*w*w));
+            return 0.9*g(1,1.1)+0.8*g(f1,1.4)+0.55*g(f2,1.8); })},
+  strings:{str:1, inh:0, gen:()=>genFrames((t,n)=>{
+            const sh=1+0.15*Math.sin(t*9+n*1.7);
+            return (1/Math.pow(n,1.15))*sh*(n<28?1:0); })},
+  bell:   {str:1, inh:8.0, gen:()=>genFrames((t,n)=>{
+            const set={1:.55,2:.9,3:.5,4:.75,5:.3,6:.5,8:.4,10:.3,13:.22,17:.15,22:.1};
+            const a=set[n]||0;
+            // upper partials die first — classic bell
+            const dec=Math.exp(-t*(1.2+n*0.28));
+            return a*Math.max(0.015,dec); })},
+  piano:  {str:1, inh:0.6, gen:()=>genFrames((t,n)=>{
+            const a=1/Math.pow(n,0.9);
+            const dec=Math.exp(-t*(0.9+n*0.16));
+            const strike=(t<0.12&&n>10)?1.6:1;   // hammer noise burst
+            return a*dec*strike; })},
+  gamelan:{str:1.24, inh:3.0, gen:()=>genFrames((t,n)=>{
+            const set={1:.9,3:.7,5:.55,6:.4,9:.35,12:.25,16:.18};
+            const a=set[n]||0;
+            const beat=1+0.25*Math.sin(t*14+n*2.1);   // shimmer beating
+            return a*Math.exp(-t*1.1)*beat; })},
+};
+
+frames = PRESETS.brass.gen();
+
+/* ---------------- audio graph ---------------- */
+let AC=null, master, comp, analyser, lfoOsc, lfoGain;
+const voices = new Map();
+let lastVoice = null;
+
+function bootAudio(){
+  if(AC) return;
+  AC = new (window.AudioContext||window.webkitAudioContext)();
+  comp = AC.createDynamicsCompressor();
+  comp.threshold.value=-12; comp.ratio.value=6; comp.knee.value=10;
+  master = AC.createGain(); master.gain.value = P.vol*0.9;
+  analyser = AC.createAnalyser(); analyser.fftSize=1024;
+  comp.connect(master); master.connect(analyser); analyser.connect(AC.destination);
+  lfoOsc = AC.createOscillator(); lfoOsc.frequency.value=P.lrate;
+  lfoGain = AC.createGain(); lfoGain.gain.value = P.ldep;
+  lfoOsc.connect(lfoGain); lfoOsc.start();
+  requestAnimationFrame(rafLoop);
+}
+
+function frameSequence(){
+  // returns array of frame indices; contour values are read per partial
+  if(P.scan==='oneshot'){ const s=[]; for(let i=0;i<NF;i++)s.push(i); return s; }
+  const cyc=[];
+  if(P.scan==='loop'){ for(let i=0;i<NF;i++)cyc.push(i); }
+  else{ for(let i=0;i<NF;i++)cyc.push(i); for(let i=NF-2;i>=1;i--)cyc.push(i); }
+  const reps=Math.max(1,Math.floor(1024/cyc.length));
+  const s=[];
+  for(let r=0;r<reps;r++) s.push(...cyc);
+  s.push(cyc[0]);
+  return s;
+}
+
+function noteOn(midi, vel=1){
+  if(!AC) return;
+  if(AC.state==='suspended') AC.resume();
+  if(voices.has(midi)) noteOff(midi,true);
+  if(voices.size>=8){ const oldest=voices.keys().next().value; noteOff(oldest,true); }
+
+  const amp=0.10+0.90*Math.pow(vel,1.6);   // velocity curve
+  const t0=AC.currentTime+0.004;
+  const f0=440*Math.pow(2,(midi-69)/12)*Math.pow(2,P.oct);
+  const seq=frameSequence(); const d=P.ftime;
+  const dur=Math.max(0.011,(seq.length-1)*d);
+  const nyq=AC.sampleRate*0.45;
+
+  const vGain=AC.createGain(); vGain.gain.value=0;
+  const filt=AC.createBiquadFilter(); filt.type='lowpass'; filt.Q.value=P.res;
+  const sum=AC.createGain(); sum.gain.value=0.20;
+  sum.connect(filt); filt.connect(vGain); vGain.connect(comp);
+
+  // filter envelope
+  const base=cutHz(P.cut);
+  if(P.famt!==0){
+    const target=Math.max(40,Math.min(20000, base*Math.pow(2,(P.famt/100)*4)));
+    filt.frequency.setValueAtTime(base,t0);
+    filt.frequency.linearRampToValueAtTime(target,t0+Math.max(0.005,P.att));
+    filt.frequency.setTargetAtTime(base,t0+P.att,Math.max(0.02,P.dec/3));
+  } else filt.frequency.setValueAtTime(base,t0);
+
+  // amp ADSR (scaled by velocity)
+  vGain.gain.setValueAtTime(0,t0);
+  vGain.gain.linearRampToValueAtTime(amp,t0+Math.max(0.002,P.att));
+  vGain.gain.setTargetAtTime(P.sus*amp,t0+Math.max(0.002,P.att),Math.max(0.01,P.dec/3));
+
+  // vibrato onset
+  const vib=AC.createGain();
+  vib.gain.setValueAtTime(0,t0);
+  vib.gain.linearRampToValueAtTime(1,t0+Math.max(0.01,P.ldel)+0.4);
+  lfoGain.connect(vib);
+
+  // ---- per-partial oscillator bank ----
+  const parts=[];
+  for(let h=0;h<NH;h++){
+    // skip partials silent in every frame
+    let peak=0; for(let t=0;t<NF;t++) peak=Math.max(peak,frames[t][h]);
+    if(peak<=0.001) continue;
+    const fr=f0*ratioOf(h+1);
+    if(fr>nyq) continue;
+
+    const curve=new Float32Array(seq.length);
+    for(let k=0;k<seq.length;k++) curve[k]=frames[seq[k]][h];
+
+    const g=AC.createGain();
+    g.gain.setValueCurveAtTime(curve,t0,dur);
+    const o=AC.createOscillator();
+    o.type='sine'; o.frequency.value=fr; o.detune.value=P.tune+bendCents;
+    vib.connect(o.detune);
+    o.connect(g); g.connect(sum); o.start(t0);
+    parts.push({o,g,n:h+1});
+  }
+
+  const v={parts,sum,vGain,filt,vib,t0,midi,f0};
+  voices.set(midi,v); lastVoice=v;
+  uiKeyDown(midi,true);
+}
+
+function noteOff(midi,steal){
+  const v=voices.get(midi); if(!v) return;
+  voices.delete(midi); uiKeyDown(midi,false);
+  const t=AC.currentTime;
+  const rel=steal?0.02:P.rel;
+  v.vGain.gain.cancelScheduledValues(t);
+  v.vGain.gain.setValueAtTime(v.vGain.gain.value,t);
+  v.vGain.gain.setTargetAtTime(0,t,Math.max(0.005,rel/4));
+  const stopAt=t+rel+0.25;
+  v.parts.forEach(p=>{try{p.o.stop(stopAt);}catch(e){}});
+  setTimeout(()=>{try{v.vib.disconnect();v.vGain.disconnect();v.filt.disconnect();v.sum.disconnect();}catch(e){}},(rel+0.4)*1000);
+}
+
+function retuneLive(){
+  // live-update partial frequencies on held voices (stretch / inharm / fine tune)
+  if(!AC) return;
+  const t=AC.currentTime;
+  voices.forEach(v=>{
+    v.parts.forEach(p=>{
+      const fr=v.f0*ratioOf(p.n);
+      p.o.frequency.setTargetAtTime(fr,t,0.02);
+    });
+  });
+}
+
+/* ---------------- drawing surface ---------------- */
+const hc=document.getElementById('harmCanvas'), hx=hc.getContext('2d');
+const penReadout=document.getElementById('penReadout');
+const canvasCap=document.getElementById('canvasCap');
+let penDown=false, lastPen=null;
+
+function drawSurface(playPos){
+  const W=hc.width,H=hc.height;
+  hx.fillStyle='#04120a'; hx.fillRect(0,0,W,H);
+
+  if(editMode==='fall'){ drawWaterfall(playPos); drawWave(); drawTab(curFrame); return; }
+
+  if(editMode==='spec'){
+    const bw=W/NH;
+    hx.strokeStyle='#0a3a1f'; hx.lineWidth=1;
+    for(let i=0;i<=4;i++){const y=(H-18)*i/4+4;hx.beginPath();hx.moveTo(0,y);hx.lineTo(W,y);hx.stroke();}
+    const data=frames[curFrame];
+    for(let h=0;h<NH;h++){
+      const a=data[h], bh=a*(H-22), x=h*bw+2, y=H-18-bh;
+      hx.fillStyle=`rgba(71,255,138,${0.35+0.65*a})`;
+      hx.fillRect(x,y,bw-4,bh);
+      hx.fillStyle=(h===selH)?'#ffd23f':(a>0?'#47ff8a':'#0f5a2e');
+      hx.fillRect(x,y-2,bw-4,2);
+      if(h===selH){hx.fillStyle='rgba(255,210,63,0.10)';hx.fillRect(x-1,4,bw-2,H-22);}
+      hx.fillStyle='#0f5a2e'; hx.font='12px VT323, monospace'; hx.textAlign='center';
+      if(h===0||(h+1)%4===0) hx.fillText(h+1,x+(bw-4)/2,H-5);
+    }
+  } else {
+    // ENVELOPE mode: x = frames, y = amp of selected partial
+    const fw=W/(NF-1);
+    hx.strokeStyle='#0a3a1f'; hx.lineWidth=1;
+    for(let f=0;f<NF;f++){const x=f*fw;hx.beginPath();hx.moveTo(x,4);hx.lineTo(x,H-18);hx.stroke();}
+    for(let i=0;i<=4;i++){const y=(H-22)*i/4+4;hx.beginPath();hx.moveTo(0,y);hx.lineTo(W,y);hx.stroke();}
+    hx.fillStyle='#0f5a2e'; hx.font='12px VT323, monospace'; hx.textAlign='center';
+    for(let f=0;f<NF;f++) if(f===0||(f+1)%4===0) hx.fillText('F'+(f+1),f*fw,H-5);
+    // ghost curves
+    for(let h=0;h<NH;h++){
+      if(h===selH) continue;
+      hx.strokeStyle='rgba(46,203,106,0.16)'; hx.beginPath();
+      for(let f=0;f<NF;f++){const x=f*fw,y=H-18-frames[f][h]*(H-22);
+        f?hx.lineTo(x,y):hx.moveTo(x,y);}
+      hx.stroke();
+    }
+    // selected partial
+    hx.strokeStyle='#47ff8a'; hx.lineWidth=2;
+    hx.shadowColor='rgba(71,255,138,0.7)'; hx.shadowBlur=6;
+    hx.beginPath();
+    for(let f=0;f<NF;f++){const x=f*fw,y=H-18-frames[f][selH]*(H-22);
+      f?hx.lineTo(x,y):hx.moveTo(x,y);}
+    hx.stroke(); hx.shadowBlur=0; hx.lineWidth=1;
+    hx.fillStyle='#47ff8a';
+    for(let f=0;f<NF;f++){const x=f*fw,y=H-18-frames[f][selH]*(H-22);
+      hx.fillRect(x-2,y-2,4,4);}
+    // playback cursor
+    if(playPos!==undefined && playPos!==null){
+      const x=playPos/(NF-1)*W;
+      hx.strokeStyle='#ffd23f'; hx.shadowColor='rgba(255,210,63,0.8)'; hx.shadowBlur=6;
+      hx.beginPath(); hx.moveTo(x,4); hx.lineTo(x,H-18); hx.stroke(); hx.shadowBlur=0;
+    }
+  }
+  drawWave(); drawTab(curFrame);
+}
+
+/* ---------------- waterfall (Page D style) ---------------- */
+function wfGeom(){
+  const W=hc.width,H=hc.height;
+  const R = wfView==='contours' ? NH : NF;
+  const skew=140, rise=118;
+  return {
+    R,
+    dx:skew/(R-1), dy:rise/(R-1),
+    x0:28, yBase:H-26,
+    plotW:W-56-skew,
+    ampH: wfView==='contours' ? 62 : 78,
+  };
+}
+function drawWaterfall(playPos){
+  const G=wfGeom();
+  const rows=[];
+  let gmax=1;
+
+  if(wfView==='waves'){
+    // computed cycle per frame, normalized to global max so level evolution shows
+    const N=96; gmax=0;
+    for(let f=0;f<NF;f++){
+      const s=new Float32Array(N), d=frames[f];
+      for(let x=0;x<N;x++){ let v=0;
+        for(let h=0;h<NH;h++) if(d[h]) v+=d[h]*Math.sin(2*Math.PI*ratioOf(h+1)*x/N);
+        s[x]=v; gmax=Math.max(gmax,Math.abs(v)); }
+      rows.push(s);
+    }
+    if(!gmax) gmax=1;
+  }
+
+  // playback frame (frame-row views)
+  let playRow=null;
+  if(playPos!==undefined && playPos!==null && wfView!=='contours')
+    playRow=Math.round(Math.max(0,Math.min(NF-1,playPos)));
+
+  // back to front
+  for(let i=G.R-1;i>=0;i--){
+    const xo=G.x0+i*G.dx, yb=G.yBase-i*G.dy;
+    const pts=[];
+    if(wfView==='spectra'){
+      for(let h=0;h<NH;h++) pts.push([xo+h/(NH-1)*G.plotW, yb-frames[i][h]*G.ampH]);
+    } else if(wfView==='waves'){
+      const s=rows[i], N=s.length;
+      for(let x=0;x<N;x++) pts.push([xo+x/(N-1)*G.plotW, yb-G.ampH*0.5-(s[x]/gmax)*G.ampH*0.5]);
+    } else {
+      for(let f=0;f<NF;f++) pts.push([xo+f/(NF-1)*G.plotW, yb-frames[f][i]*G.ampH]);
+    }
+    // occluding fill down to this row's baseline
+    hx.beginPath();
+    hx.moveTo(pts[0][0],yb);
+    pts.forEach(p=>hx.lineTo(p[0],p[1]));
+    hx.lineTo(pts[pts.length-1][0],yb);
+    hx.closePath();
+    hx.fillStyle='#04120a'; hx.fill();
+
+    const depth=1-i/(G.R-1);                       // 1 = front
+    const isSel = (wfView==='contours') ? i===selH : i===curFrame;
+    const isPlay = playRow!==null && i===playRow;
+    if(isPlay){ hx.strokeStyle='#ffd23f'; hx.shadowColor='rgba(255,210,63,0.8)'; hx.shadowBlur=6; hx.lineWidth=1.6; }
+    else if(isSel){ hx.strokeStyle='#47ff8a'; hx.shadowColor='rgba(71,255,138,0.7)'; hx.shadowBlur=5; hx.lineWidth=1.6; }
+    else { hx.strokeStyle=`rgba(71,255,138,${0.22+0.62*depth})`; hx.shadowBlur=0; hx.lineWidth=1; }
+    hx.beginPath();
+    pts.forEach((p,j)=>j?hx.lineTo(p[0],p[1]):hx.moveTo(p[0],p[1]));
+    hx.stroke();
+    hx.shadowBlur=0; hx.lineWidth=1;
+  }
+
+  // playback trace across contour ridges
+  if(playPos!==undefined && playPos!==null && wfView==='contours'){
+    const pos=Math.max(0,Math.min(NF-1,playPos));
+    const f0=Math.floor(pos), f1=Math.min(NF-1,f0+1), ft=pos-f0;
+    hx.strokeStyle='#ffd23f'; hx.shadowColor='rgba(255,210,63,0.8)'; hx.shadowBlur=5;
+    hx.beginPath();
+    for(let i=0;i<NH;i++){
+      const xo=G.x0+i*G.dx, yb=G.yBase-i*G.dy;
+      const v=frames[f0][i]+(frames[f1][i]-frames[f0][i])*ft;
+      const x=xo+pos/(NF-1)*G.plotW, y=yb-v*G.ampH;
+      i?hx.lineTo(x,y):hx.moveTo(x,y);
+    }
+    hx.stroke(); hx.shadowBlur=0;
+  }
+
+  // axis labels: front and back rows
+  hx.fillStyle='#0f5a2e'; hx.font='13px VT323, monospace';
+  hx.textAlign='left';
+  const backX=G.x0+(G.R-1)*G.dx, backY=G.yBase-(G.R-1)*G.dy;
+  if(wfView==='contours'){
+    hx.fillText('P01',G.x0,G.yBase+14);
+    hx.fillText('P32',backX+G.plotW+6,backY);
+    hx.fillText('F1 \u2192 F16',G.x0+G.plotW*0.45,G.yBase+14);
+  } else {
+    hx.fillText('F1',G.x0,G.yBase+14);
+    hx.fillText('F16',backX+G.plotW+6,backY);
+    hx.fillText(wfView==='waves'?'\u2190 ONE CYCLE \u2192':'H1 \u2192 H32',G.x0+G.plotW*0.4,G.yBase+14);
+  }
+}
+
+/* row picking for waterfall clicks / hover */
+function wfPickRow(e){
+  const r=hc.getBoundingClientRect();
+  const y=(e.clientY-r.top)/r.height*hc.height;
+  const G=wfGeom();
+  const i=Math.round((G.yBase-y)/G.dy);
+  return Math.max(0,Math.min(G.R-1,i));
+}
+
+function updateCaps(){
+  if(editMode==='spec') canvasCap.textContent=`AMPLITUDE — FRAME ${curFrame+1}`;
+  else if(editMode==='env') canvasCap.textContent=`ENVELOPE — PARTIAL ${String(selH+1).padStart(2,'0')} ACROSS FRAMES 1–${NF}`;
+  else canvasCap.textContent = wfView==='spectra'
+    ? `WATERFALL — SPECTRA, FRAMES 1–${NF} RECEDING`
+    : wfView==='waves'
+      ? `WATERFALL — COMPUTED WAVEFORMS, FRAMES 1–${NF} RECEDING`
+      : `WATERFALL — PER-PARTIAL CONTOURS, PARTIALS 1–${NH} RECEDING`;
+  document.getElementById('pselLbl').textContent =
+    `PARTIAL ${String(selH+1).padStart(2,'0')} · R ${ratioOf(selH+1).toFixed(3)}`;
+}
+
+function penPoint(e){
+  const r=hc.getBoundingClientRect();
+  const x=(e.clientX-r.left)/r.width*hc.width;
+  const y=(e.clientY-r.top)/r.height*hc.height;
+  if(editMode==='spec'){
+    const h=Math.max(0,Math.min(NH-1,Math.floor(x/(hc.width/NH))));
+    const a=Math.max(0,Math.min(1,(hc.height-18-y)/(hc.height-22)));
+    return {i:h,a};
+  } else {
+    const f=Math.max(0,Math.min(NF-1,Math.round(x/hc.width*(NF-1))));
+    const a=Math.max(0,Math.min(1,(hc.height-18-y)/(hc.height-22)));
+    return {i:f,a};
+  }
+}
+function applyPen(p){
+  const store = editMode==='spec'
+    ? (i,a)=>frames[curFrame][i]=a
+    : (i,a)=>frames[i][selH]=a;
+  if(lastPen && Math.abs(p.i-lastPen.i)>1){
+    const lo=Math.min(p.i,lastPen.i), hi=Math.max(p.i,lastPen.i);
+    for(let i=lo;i<=hi;i++){
+      const t=(i-lastPen.i)/(p.i-lastPen.i);
+      store(i,lastPen.a+(p.a-lastPen.a)*t);
+    }
+  } else store(p.i,p.a);
+  lastPen=p;
+  penReadout.textContent = editMode==='spec'
+    ? `H${String(p.i+1).padStart(2,'0')} A${Math.round(p.a*100)}`
+    : `F${String(p.i+1).padStart(2,'0')} A${Math.round(p.a*100)}`;
+  if(editMode==='env') drawAllTabs();
+  drawSurface();
+}
+hc.addEventListener('pointerdown',e=>{
+  if(editMode==='fall'){
+    const i=wfPickRow(e);
+    if(wfView==='contours'){ selH=i; }
+    else { curFrame=i;
+      document.querySelectorAll('.ftab').forEach((t,j)=>t.classList.toggle('active',j===i)); }
+    updateCaps(); drawSurface();
+    return;
+  }
+  penDown=true;lastPen=null;hc.setPointerCapture(e.pointerId);
+  const p=penPoint(e);
+  if(editMode==='spec'){ selH=p.i; updateCaps(); }   // click also selects partial
+  applyPen(p);
+});
+hc.addEventListener('pointermove',e=>{
+  if(editMode==='fall'){
+    const i=wfPickRow(e);
+    penReadout.textContent = wfView==='contours'
+      ? `RIDGE P${String(i+1).padStart(2,'0')}`
+      : `RIDGE F${String(i+1).padStart(2,'0')}`;
+    return;
+  }
+  if(penDown) applyPen(penPoint(e));
+  else{const p=penPoint(e);
+    penReadout.textContent = editMode==='spec'
+      ? `H${String(p.i+1).padStart(2,'0')} A${Math.round(frames[curFrame][p.i]*100)}`
+      : `F${String(p.i+1).padStart(2,'0')} A${Math.round(frames[p.i][selH]*100)}`;}
+});
+addEventListener('pointerup',()=>{penDown=false;lastPen=null;});
+
+/* ---------------- frame tabs ---------------- */
+const tabsEl=document.getElementById('frameTabs');
+const tabCtx=[];
+for(let i=0;i<NF;i++){
+  const d=document.createElement('div'); d.className='ftab'+(i===0?' active':'');
+  const c=document.createElement('canvas'); c.width=44; c.height=20;
+  const l=document.createElement('div'); l.className='flab'; l.textContent='F'+(i+1);
+  d.appendChild(c); d.appendChild(l); tabsEl.appendChild(d);
+  tabCtx.push(c.getContext('2d'));
+  d.addEventListener('click',()=>{curFrame=i;
+    document.querySelectorAll('.ftab').forEach((t,j)=>t.classList.toggle('active',j===i));
+    updateCaps(); drawSurface();});
+}
+function drawTab(i){
+  const cx=tabCtx[i],W=44,H=20;
+  cx.fillStyle='#04120a'; cx.fillRect(0,0,W,H);
+  cx.fillStyle='#2ecb6a';
+  for(let h=0;h<NH;h++){const a=frames[i][h];cx.fillRect(h*(W/NH),H-a*H,W/NH*0.8,a*H);}
+}
+function drawAllTabs(){for(let i=0;i<NF;i++)drawTab(i);}
+
+/* ---------------- waveform preview ---------------- */
+const wc=document.getElementById('waveCanvas'), wx=wc.getContext('2d');
+function drawWave(){
+  const W=wc.width,H=wc.height;
+  const d = editMode==='spec' ? frames[curFrame] : frames[Math.min(curFrame,NF-1)];
+  wx.fillStyle='#04120a'; wx.fillRect(0,0,W,H);
+  wx.strokeStyle='#0a3a1f'; wx.beginPath(); wx.moveTo(0,H/2); wx.lineTo(W,H/2); wx.stroke();
+  let max=0; const N=W, samp=new Float32Array(N);
+  for(let x=0;x<N;x++){ let s=0;
+    for(let h=0;h<NH;h++) if(d[h]) s+=d[h]*Math.sin(2*Math.PI*ratioOf(h+1)*2*x/N);
+    samp[x]=s; max=Math.max(max,Math.abs(s)); }
+  wx.strokeStyle='#47ff8a'; wx.shadowColor='rgba(71,255,138,0.6)'; wx.shadowBlur=4;
+  wx.beginPath();
+  for(let x=0;x<N;x++){ const y=H/2-(max?samp[x]/max:0)*(H/2-8);
+    x?wx.lineTo(x,y):wx.moveTo(x,y); }
+  wx.stroke(); wx.shadowBlur=0;
+}
+
+/* ---------------- scope + playback cursor ---------------- */
+const sc=document.getElementById('scopeCanvas'), sx=sc.getContext('2d');
+let wasPlaying=false;
+function morphPos(el){
+  const steps=el/P.ftime;
+  if(P.scan==='oneshot') return Math.min(NF-1,steps);
+  if(P.scan==='loop') return steps%NF;
+  const cyc=2*NF-2, m=steps%cyc;
+  return m<NF-1?m:cyc-m;
+}
+function rafLoop(){
+  requestAnimationFrame(rafLoop);
+  const W=sc.width,H=sc.height;
+  sx.fillStyle='rgba(4,18,10,0.4)'; sx.fillRect(0,0,W,H);
+  if(analyser){
+    const buf=new Uint8Array(analyser.fftSize);
+    analyser.getByteTimeDomainData(buf);
+    sx.strokeStyle='#47ff8a'; sx.beginPath();
+    for(let x=0;x<W;x++){ const v=buf[Math.floor(x/W*buf.length)]/128-1;
+      const y=H/2+v*(H/2-6); x?sx.lineTo(x,y):sx.moveTo(x,y); }
+    sx.stroke();
+  }
+  document.querySelectorAll('.ftab').forEach(t=>t.classList.remove('playing'));
+  if(lastVoice && AC && voices.size){
+    wasPlaying=true;
+    const el=AC.currentTime-lastVoice.t0;
+    if(el>=0){
+      const pos=morphPos(el);
+      const tab=tabsEl.children[Math.round(Math.max(0,Math.min(NF-1,pos)))];
+      if(tab) tab.classList.add('playing');
+      if(editMode==='env'||editMode==='fall') drawSurface(pos);
+    }
+  } else if(wasPlaying){
+    wasPlaying=false;
+    if(editMode==='env'||editMode==='fall') drawSurface();
+  }
+}
+
+/* ---------------- tools ---------------- */
+document.getElementById('clearBtn').onclick=()=>{frames[curFrame]=new Float32Array(NH);drawSurface();};
+document.getElementById('copyNextBtn').onclick=()=>{ if(curFrame<NF-1){frames[curFrame+1]=Float32Array.from(frames[curFrame]); drawTab(curFrame+1);} };
+document.getElementById('copyAllBtn').onclick=()=>{for(let i=0;i<NF;i++)if(i!==curFrame)frames[i]=Float32Array.from(frames[curFrame]);drawAllTabs();};
+document.getElementById('halveBtn').onclick=()=>{frames[curFrame]=frames[curFrame].map(v=>v*0.5);drawSurface();};
+
+document.getElementById('envClearBtn').onclick=()=>{for(let f=0;f<NF;f++)frames[f][selH]=0;drawAllTabs();drawSurface();};
+document.getElementById('envDecayBtn').onclick=()=>{
+  let pk=0;for(let f=0;f<NF;f++)pk=Math.max(pk,frames[f][selH]); if(!pk)pk=1;
+  for(let f=0;f<NF;f++)frames[f][selH]=pk*Math.exp(-3*f/(NF-1));
+  drawAllTabs();drawSurface();};
+document.getElementById('envSwellBtn').onclick=()=>{
+  let pk=0;for(let f=0;f<NF;f++)pk=Math.max(pk,frames[f][selH]); if(!pk)pk=1;
+  for(let f=0;f<NF;f++)frames[f][selH]=pk*Math.pow(f/(NF-1),1.4);
+  drawAllTabs();drawSurface();};
+document.getElementById('envApplyBtn').onclick=()=>{
+  const env=[]; let em=0;
+  for(let f=0;f<NF;f++){env.push(frames[f][selH]);em=Math.max(em,frames[f][selH]);}
+  if(!em) return;
+  for(let h=0;h<NH;h++){
+    if(h===selH) continue;
+    let pk=0; for(let f=0;f<NF;f++)pk=Math.max(pk,frames[f][h]);
+    if(!pk) continue;
+    for(let f=0;f<NF;f++) frames[f][h]=pk*(env[f]/em);
+  }
+  drawAllTabs();drawSurface();};
+
+document.getElementById('presetSel').onchange=e=>{
+  const pr=PRESETS[e.target.value];
+  if(pr){
+    frames=pr.gen();
+    P.stretch=pr.str; P.inharm=pr.inh;
+    document.getElementById('p_str').value=pr.str;
+    document.getElementById('p_inh').value=pr.inh;
+    document.getElementById('v_str').textContent=pr.str.toFixed(3);
+    document.getElementById('v_inh').textContent=pr.inh.toFixed(1);
+    document.getElementById('v_p32').textContent=ratioOf(32).toFixed(2);
+    retuneLive(); updateCaps();
+    drawSurface(); drawAllTabs();
+  }
+  e.target.value='';
+};
+
+/* ---------------- mode + partial select ---------------- */
+const modeSeg=document.getElementById('modeSeg');
+modeSeg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+  modeSeg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); editMode=b.dataset.v;
+  document.getElementById('toolsSpec').style.display = editMode==='spec'?'flex':'none';
+  document.getElementById('toolsEnv').style.display  = editMode==='env'?'flex':'none';
+  document.getElementById('toolsFall').style.display = editMode==='fall'?'flex':'none';
+  hc.style.cursor = editMode==='fall'?'pointer':'crosshair';
+  updateCaps(); drawSurface();
+}));
+document.getElementById('pPrev').onclick=()=>{selH=(selH+NH-1)%NH;updateCaps();drawSurface();};
+document.getElementById('pNext').onclick=()=>{selH=(selH+1)%NH;updateCaps();drawSurface();};
+
+/* ---------------- parameter wiring ---------------- */
+function bind(id,fn,fmt,vid){
+  const el=document.getElementById(id);
+  const update=()=>{const v=parseFloat(el.value);fn(v);document.getElementById(vid).textContent=fmt(v);};
+  el.addEventListener('input',update); update();
+}
+bind('p_str',v=>{P.stretch=v;retuneLive();
+  document.getElementById('v_p32').textContent=ratioOf(32).toFixed(2);
+  updateCaps();drawWave();},v=>v.toFixed(3),'v_str');
+bind('p_inh',v=>{P.inharm=v;retuneLive();
+  document.getElementById('v_p32').textContent=ratioOf(32).toFixed(2);
+  updateCaps();drawWave();},v=>v.toFixed(1),'v_inh');
+bind('p_ftime',v=>P.ftime=v/1000,v=>v+' MS','v_ftime');
+bind('p_att',v=>P.att=v/1000,v=>v+' MS','v_att');
+bind('p_dec',v=>P.dec=v/1000,v=>v+' MS','v_dec');
+bind('p_sus',v=>P.sus=v/100,v=>v+' %','v_sus');
+bind('p_rel',v=>P.rel=v/1000,v=>v+' MS','v_rel');
+bind('p_cut',v=>{P.cut=v;if(AC)voices.forEach(vo=>vo.filt.frequency.setTargetAtTime(cutHz(v),AC.currentTime,0.02));},
+  v=>{const hz=cutHz(v);return hz>=1000?(hz/1000).toFixed(1)+' KHZ':Math.round(hz)+' HZ';},'v_cut');
+bind('p_res',v=>{P.res=v;if(AC)voices.forEach(vo=>vo.filt.Q.setTargetAtTime(v,AC.currentTime,0.02));},v=>v.toFixed(1)+' Q','v_res');
+bind('p_famt',v=>P.famt=v,v=>v+' %','v_famt');
+bind('p_lrate',v=>{P.lrate=v;if(lfoOsc)lfoOsc.frequency.setTargetAtTime(v,AC.currentTime,0.05);},v=>v.toFixed(1)+' HZ','v_lrate');
+bind('p_ldep',v=>{P.ldep=v;applyLfoDepth();},v=>v+' C','v_ldep');
+bind('p_ldel',v=>P.ldel=v/1000,v=>v+' MS','v_ldel');
+bind('p_tune',v=>{P.tune=v;applyBend();},v=>v+' C','v_tune');
+bind('p_vol',v=>{P.vol=v/100;if(master)master.gain.setTargetAtTime(P.vol*0.9,AC.currentTime,0.03);},v=>v+' %','v_vol');
+
+function segWire(id,fn){
+  const seg=document.getElementById(id);
+  seg.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>{
+    seg.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); fn(b.dataset.v);
+  }));
+}
+segWire('scanSeg',v=>P.scan=v);
+segWire('octSeg',v=>P.oct=parseInt(v,10));
+segWire('fallSeg',v=>{wfView=v;updateCaps();drawSurface();});
+
+/* ---------------- power ---------------- */
+const pw=document.getElementById('powerBtn');
+pw.onclick=()=>{ bootAudio();
+  if(AC.state==='suspended') AC.resume();
+  pw.classList.add('on'); pw.textContent='AUDIO: ON'; };
+
+/* ---------------- keyboard ---------------- */
+const kb=document.getElementById('kb');
+const KEYMAP={'a':60,'w':61,'s':62,'e':63,'d':64,'f':65,'t':66,'g':67,'y':68,'h':69,'u':70,'j':71,'k':72,'o':73,'l':74,'p':75,';':76};
+let kbOct=0;
+const whiteNotes=[]; const START=48, END=84;
+for(let m=START;m<=END;m++){ const pc=m%12;
+  if([0,2,4,5,7,9,11].includes(pc)) whiteNotes.push(m); }
+const keyEls={};
+whiteNotes.forEach(m=>{
+  const k=document.createElement('div'); k.className='key white'; k.dataset.m=m;
+  const pc=m%12;
+  if(pc===0){const l=document.createElement('div');l.className='kl';l.textContent='C'+(Math.floor(m/12)-1);k.appendChild(l);}
+  if([0,2,5,7,9].includes(pc) && m<END){
+    const b=document.createElement('div'); b.className='bk'; b.dataset.m=m+1; k.appendChild(b); keyEls[m+1]=b;
+  }
+  kb.appendChild(k); keyEls[m]=k;
+});
+function startNote(m, vel=1){ if(!AC){bootAudio();pw.classList.add('on');pw.textContent='AUDIO: ON';} noteOn(m, vel); }
+kb.addEventListener('pointerdown',e=>{ const t=e.target.closest('.bk')||e.target.closest('.key');
+  if(t&&t.dataset.m){e.preventDefault(); const m=+t.dataset.m; startNote(m);
+    const up=()=>{noteOff(m);removeEventListener('pointerup',up);};
+    addEventListener('pointerup',up);} });
+function uiKeyDown(m,on){ const el=keyEls[m]; if(el) el.classList.toggle('down',on); }
+
+const held=new Set();
+addEventListener('keydown',e=>{
+  if(e.repeat||e.target.tagName==='SELECT'||e.target.tagName==='INPUT')return;
+  const k=e.key.toLowerCase();
+  if(k==='z'){kbOct=Math.max(-2,kbOct-1);return;}
+  if(k==='x'){kbOct=Math.min(2,kbOct+1);return;}
+  if(KEYMAP[k]!==undefined && !held.has(k)){held.add(k); startNote(KEYMAP[k]+kbOct*12);}
+});
+addEventListener('keyup',e=>{
+  const k=e.key.toLowerCase();
+  if(KEYMAP[k]!==undefined){held.delete(k); noteOff(KEYMAP[k]+kbOct*12);}
+});
+
+/* ---------------- Web MIDI ---------------- */
+let bendCents=0, modCents=0, pedalDown=false;
+const pedalHeld=new Set();
+const midiStat=document.getElementById('midiStat');
+
+function applyBend(){
+  if(!AC) return;
+  const t=AC.currentTime, d=P.tune+bendCents;
+  voices.forEach(v=>v.parts.forEach(p=>p.o.detune.setTargetAtTime(d,t,0.005)));
+}
+function applyLfoDepth(){
+  if(lfoGain && AC) lfoGain.gain.setTargetAtTime(P.ldep+modCents,AC.currentTime,0.03);
+}
+
+function midiMessage(ev){
+  const [st,d1,d2]=ev.data;
+  const cmd=st&0xF0;
+  if(cmd===0x90 && d2>0){
+    pedalHeld.delete(d1);
+    startNote(d1, d2/127);
+  }
+  else if(cmd===0x80 || (cmd===0x90 && d2===0)){
+    if(pedalDown) pedalHeld.add(d1); else noteOff(d1);
+  }
+  else if(cmd===0xB0){
+    if(d1===64){                       // sustain pedal
+      pedalDown=d2>=64;
+      if(!pedalDown){ pedalHeld.forEach(n=>noteOff(n)); pedalHeld.clear(); }
+    }
+    else if(d1===1){ modCents=(d2/127)*45; applyLfoDepth(); }   // mod wheel → vibrato
+    else if(d1===123||d1===120){ [...voices.keys()].forEach(n=>noteOff(n,true)); pedalHeld.clear(); }
+  }
+  else if(cmd===0xE0){                 // pitch bend ±200 cents
+    bendCents=((d2<<7|d1)-8192)/8192*200;
+    applyBend();
+  }
+}
+
+function midiSetup(){
+  if(!navigator.requestMIDIAccess){ midiStat.textContent='MIDI: NOT SUPPORTED'; return; }
+  navigator.requestMIDIAccess({sysex:false}).then(acc=>{
+    const wire=()=>{
+      const names=[];
+      acc.inputs.forEach(inp=>{ inp.onmidimessage=midiMessage; names.push(inp.name); });
+      midiStat.textContent = names.length
+        ? 'MIDI: '+names.join(' + ').toUpperCase().slice(0,44)
+        : 'MIDI: NO DEVICES';
+      midiStat.style.color = names.length ? 'var(--ph2)' : 'var(--dim)';
+    };
+    wire();
+    acc.onstatechange=wire;
+  }).catch(()=>{ midiStat.textContent='MIDI: ACCESS DENIED'; });
+}
+midiSetup();
+
+/* ---------------- init ---------------- */
+updateCaps(); drawSurface(); drawAllTabs();
+</script>
+</body>
+</html>
